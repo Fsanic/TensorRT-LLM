@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List
-
 from evaluator import equal_group
+
 
 from tensorrt_llm.scaffolding.controller import Controller, ScaffoldingOutput
 from tensorrt_llm.scaffolding.task import GenerationTask
