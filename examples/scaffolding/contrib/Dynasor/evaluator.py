@@ -2,10 +2,19 @@
 # Original source: https://github.com/QwenLM/Qwen2.5-Math
 # Thank you to the original authors for their valuable contribution
 
+"""
+Mathematical Expression Evaluator Module
+
+This module provides functionality for evaluating and comparing mathematical expressions,
+particularly for assessing the correctness of model-generated answers to mathematical problems.
+It handles various formats of mathematical expressions, including LaTeX notation, and provides
+methods to normalize, parse, and compare these expressions.
+"""
+
 import multiprocessing
 import re
 from math import isclose
-from typing import Union
+from typing import Union, List, Any, Optional, Tuple, Dict, Callable
 
 import regex
 from latex2sympy2 import latex2sympy
@@ -15,7 +24,18 @@ from sympy.parsing.sympy_parser import parse_expr
 from word2number import w2n
 
 
-def _fix_fracs(string):
+def _fix_fracs(string: str) -> str:
+    """
+    Fix fraction notation in LaTeX strings.
+    
+    Converts improper fraction notation (e.g., \frac12) to proper notation (e.g., \frac{1}{2}).
+    
+    Args:
+        string: A LaTeX string that may contain improper fraction notation.
+        
+    Returns:
+        A string with proper fraction notation.
+    """
     substrs = string.split("\\frac")
     new_str = substrs[0]
     if len(substrs) > 1:
@@ -47,7 +67,16 @@ def _fix_fracs(string):
     return string
 
 
-def _fix_a_slash_b(string):
+def _fix_a_slash_b(string: str) -> str:
+    """
+    Convert simple fraction notation (a/b) to LaTeX fraction notation (\frac{a}{b}).
+    
+    Args:
+        string: A string that may contain simple fraction notation.
+        
+    Returns:
+        A string with LaTeX fraction notation.
+    """
     if len(string.split("/")) != 2:
         return string
     a = string.split("/")[0]
@@ -64,12 +93,32 @@ def _fix_a_slash_b(string):
         return string
 
 
-def _fix_sqrt(string):
+def _fix_sqrt(string: str) -> str:
+    """
+    Fix square root notation in LaTeX strings.
+    
+    Ensures proper braces around the argument of square root.
+    
+    Args:
+        string: A LaTeX string that may contain improper square root notation.
+        
+    Returns:
+        A string with proper square root notation.
+    """
     _string = re.sub(r"\\sqrt(\w+)", r"\\sqrt{\1}", string)
     return _string
 
 
 def convert_word_number(text: str) -> str:
+    """
+    Convert word representations of numbers to their numerical form.
+    
+    Args:
+        text: A string that may contain word representations of numbers.
+        
+    Returns:
+        A string with numerical representations of numbers.
+    """
     try:
         text = str(w2n.word_to_num(text))
     except:
@@ -78,7 +127,7 @@ def convert_word_number(text: str) -> str:
 
 
 # units mainly from MathQA
-unit_texts = [
+unit_texts: List[str] = [
     "east",
     "degree",
     "mph",
@@ -216,7 +265,20 @@ unit_texts = [
 unit_texts.extend([t + "s" for t in unit_texts])
 
 
-def strip_string(string, skip_unit=False):
+def strip_string(string: str, skip_unit: bool = False) -> str:
+    """
+    Clean and normalize a mathematical expression string.
+    
+    Performs various cleaning operations on a string containing a mathematical expression,
+    including removing whitespace, normalizing LaTeX notation, and handling special cases.
+    
+    Args:
+        string: The input string containing a mathematical expression.
+        skip_unit: If True, skip removing unit text from the string.
+        
+    Returns:
+        A cleaned and normalized string.
+    """
     string = str(string).strip()
     # linebreaks
     string = string.replace("\n", "")
@@ -352,7 +414,24 @@ def strip_string(string, skip_unit=False):
     return string
 
 
-def extract_answer(pred_str, data_name, use_last_number=True):
+def extract_answer(pred_str: str, data_name: str, use_last_number: bool = True) -> str:
+    """
+    Extract the answer from a model's prediction string.
+    
+    This function handles various formats of answer extraction, including:
+    - Boxed answers
+    - Final answer markers
+    - Chinese answer markers
+    - Last number in the text
+    
+    Args:
+        pred_str: The prediction string from the model.
+        data_name: The name of the dataset being evaluated.
+        use_last_number: If True, extract the last number in the text if no other format is found.
+        
+    Returns:
+        The extracted answer as a string.
+    """
     pred_str = pred_str.replace("\u043a\u0438", "")
 
     if "final answer is $" in pred_str and "$. I hope" in pred_str:
@@ -413,7 +492,17 @@ def extract_answer(pred_str, data_name, use_last_number=True):
     return pred
 
 
-def extract_first_boxed_answer(pred_str, data_name):
+def extract_first_boxed_answer(pred_str: str, data_name: str) -> str:
+    """
+    Extract the first boxed answer from a model's prediction string.
+    
+    Args:
+        pred_str: The prediction string from the model.
+        data_name: The name of the dataset being evaluated.
+        
+    Returns:
+        The first boxed answer as a string.
+    """
     pred_str = pred_str.replace("\u043a\u0438", "")
 
     if "boxed" in pred_str:
@@ -455,7 +544,17 @@ def extract_first_boxed_answer(pred_str, data_name):
     return pred
 
 
-def extract_boxed_answer(pred_str, data_name):
+def extract_boxed_answer(pred_str: str, data_name: str) -> str:
+    """
+    Extract the last boxed answer from a model's prediction string.
+    
+    Args:
+        pred_str: The prediction string from the model.
+        data_name: The name of the dataset being evaluated.
+        
+    Returns:
+        The last boxed answer as a string.
+    """
     pred_str = pred_str.replace("\u043a\u0438", "")
 
     if "boxed" in pred_str:
@@ -501,7 +600,18 @@ def extract_boxed_answer(pred_str, data_name):
 # from parser import choice_answer_clean
 
 
-def choice_answer_clean(pred: str):
+def choice_answer_clean(pred: str) -> str:
+    """
+    Clean a multiple choice answer.
+    
+    Extracts and standardizes multiple choice answers (A, B, C, D, E).
+    
+    Args:
+        pred: The prediction string that may contain a multiple choice answer.
+        
+    Returns:
+        A cleaned multiple choice answer.
+    """
     pred = pred.strip("\n").rstrip(".").rstrip("/").strip(" ").lstrip(":")
     # Clean the answer based on the dataset
     tmp = re.findall(r"\b(A|B|C|D|E)\b", pred.upper())
@@ -515,7 +625,18 @@ def choice_answer_clean(pred: str):
     return pred
 
 
-def parse_digits(num):
+def parse_digits(num: str) -> Optional[float]:
+    """
+    Parse a string containing digits into a float.
+    
+    Handles various formats including percentages and comma-separated numbers.
+    
+    Args:
+        num: A string that may contain digits.
+        
+    Returns:
+        A float if the string can be parsed, None otherwise.
+    """
     num = regex.sub(",", "", str(num))
     try:
         return float(num)
@@ -531,12 +652,30 @@ def parse_digits(num):
     return None
 
 
-def is_digit(num):
+def is_digit(num: str) -> bool:
+    """
+    Check if a string can be parsed as a number.
+    
+    Args:
+        num: A string that may contain digits.
+        
+    Returns:
+        True if the string can be parsed as a number, False otherwise.
+    """
     # paired with parse_digits
     return parse_digits(num) is not None
 
 
-def str_to_pmatrix(input_str):
+def str_to_pmatrix(input_str: str) -> str:
+    """
+    Convert a string representation of a matrix to LaTeX pmatrix format.
+    
+    Args:
+        input_str: A string containing a matrix representation.
+        
+    Returns:
+        A string with LaTeX pmatrix notation.
+    """
     input_str = input_str.strip()
     matrix_str = re.findall(r"\{.*,.*\}", input_str)
     pmatrix_list = []
@@ -557,9 +696,25 @@ def math_equal(
     timeout: bool = False,
 ) -> bool:
     """
-    Exact match of math if and only if:
-    1. numerical equal: both can convert to float and are equal
-    2. symbolic equal: both can convert to sympy expression and are equal
+    Determine if two mathematical expressions are equal.
+    
+    This function performs a comprehensive comparison of mathematical expressions,
+    handling various formats and special cases. It considers expressions equal if:
+    1. They are numerically equal (both can be converted to float and are equal)
+    2. They are symbolically equal (both can be converted to sympy expressions and are equal)
+    3. They are multiple choice answers that match
+    4. They are matrices with equal elements
+    5. They are equations with equal sides
+    
+    Args:
+        prediction: The predicted answer.
+        reference: The reference answer.
+        include_percentage: If True, consider percentage variations of the reference.
+        is_close: If True, use numerical closeness for comparison.
+        timeout: If True, use a timeout for symbolic comparison.
+        
+    Returns:
+        True if the expressions are considered equal, False otherwise.
     """
     # print("Judge:", prediction, reference)
     if prediction is None or reference is None:
@@ -709,11 +864,29 @@ def math_equal(
     return False
 
 
-def count_not_empty(answers):
+def count_not_empty(answers: List[str]) -> int:
+    """
+    Count the number of non-empty answers in a list.
+    
+    Args:
+        answers: A list of answer strings.
+        
+    Returns:
+        The number of non-empty answers.
+    """
     return sum(1 for answer in answers if answer != "")
 
 
-def equal_group(answers):
+def equal_group(answers: List[str]) -> bool:
+    """
+    Check if all answers in a group are equal.
+    
+    Args:
+        answers: A list of answer strings.
+        
+    Returns:
+        True if all answers are equal, False otherwise.
+    """
     equiv_classes = []
 
     for answer in answers:
@@ -729,11 +902,30 @@ def equal_group(answers):
     return len(equiv_classes) == 1
 
 
-def math_equal_process(param):
+def math_equal_process(param: List[Any]) -> bool:
+    """
+    Process function for parallel execution of math_equal.
+    
+    Args:
+        param: A list containing the parameters for math_equal.
+        
+    Returns:
+        The result of math_equal.
+    """
     return math_equal(param[-2], param[-1])
 
 
-def numeric_equal(prediction: float, reference: float):
+def numeric_equal(prediction: float, reference: float) -> bool:
+    """
+    Check if two numbers are numerically equal within a tolerance.
+    
+    Args:
+        prediction: The predicted number.
+        reference: The reference number.
+        
+    Returns:
+        True if the numbers are equal within a tolerance, False otherwise.
+    """
     # Note that relative tolerance has significant impact
     # on the result of the synthesized GSM-Hard dataset
     # if reference.is_integer():
@@ -743,9 +935,31 @@ def numeric_equal(prediction: float, reference: float):
     return isclose(reference, prediction, rel_tol=1e-4)
 
 
-def symbolic_equal(a, b):
+def symbolic_equal(a: str, b: str) -> bool:
+    """
+    Check if two mathematical expressions are symbolically equal.
+    
+    This function attempts to parse the expressions using various methods and
+    compares them using sympy's symbolic equality.
+    
+    Args:
+        a: The first mathematical expression.
+        b: The second mathematical expression.
+        
+    Returns:
+        True if the expressions are symbolically equal, False otherwise.
+    """
 
-    def _parse(s):
+    def _parse(s: str) -> Any:
+        """
+        Parse a string into a sympy expression.
+        
+        Args:
+            s: A string containing a mathematical expression.
+            
+        Returns:
+            A sympy expression if parsing is successful, the original string otherwise.
+        """
         for f in [parse_latex, parse_expr, latex2sympy]:
             try:
                 return f(s.replace("\\\\", "\\"))
@@ -800,12 +1014,32 @@ def symbolic_equal(a, b):
     return False
 
 
-def symbolic_equal_process(a, b, output_queue):
+def symbolic_equal_process(a: str, b: str, output_queue: multiprocessing.Queue) -> None:
+    """
+    Process function for parallel execution of symbolic_equal.
+    
+    Args:
+        a: The first mathematical expression.
+        b: The second mathematical expression.
+        output_queue: A multiprocessing Queue to store the result.
+    """
     result = symbolic_equal(a, b)
     output_queue.put(result)
 
 
-def call_with_timeout(func, *args, timeout=1, **kwargs):
+def call_with_timeout(func: Callable, *args: Any, timeout: int = 1, **kwargs: Any) -> bool:
+    """
+    Call a function with a timeout.
+    
+    Args:
+        func: The function to call.
+        *args: Positional arguments for the function.
+        timeout: The timeout in seconds.
+        **kwargs: Keyword arguments for the function.
+        
+    Returns:
+        The result of the function call, or False if the call times out.
+    """
     output_queue = multiprocessing.Queue()
     process_args = args + (output_queue, )
     process = multiprocessing.Process(target=func,
