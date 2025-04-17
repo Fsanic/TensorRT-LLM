@@ -1,33 +1,42 @@
-# Dyansor
+# Dynasor
 
- Speed up reasoning model without finetuning.
+This document shows how to speed up reasoning models **without** training or fine‑tuning by using **Dynasor** ([Efficiently Serving LLM Reasoning Programs with Certaindex](https://arxiv.org/abs/2412.20993)) in TensorRT‑LLM.
 
+## Overview
 
- ## Quick Start
+Reasoning models often exhibit poor token efficiency, wasting tokens by second‑guessing themselves. **Dynasor** is a certainty‑based approach that dynamically allocates inference compute for reasoning models and stops inference as soon as the LLM has enough information to make a decision.
 
- TODO
- ```bash
+Currently, this folder provides only **Dynasor‑CoT**, which applies Chain‑of‑Thought (CoT) reasoning. It optimizes models such as `Deepseek‑R1` and its distilled variants. Support for additional reasoning algorithms (Self‑Consistency, Monte Carlo Tree Search, and Rebase) will be added later.
 
- ```
+## Usage
 
+The core logic for **Dynasor‑CoT** lives in the `DynasorGenerationController` class in `dynasor_controller.py`. It extends the base `Controller` and implements certainty‑based stopping.
 
+You can adjust the compute‑saving level by initializing `DynasorGenerationController` with different values for:
 
+- `certainty_threshold`: Number of consecutive identical and confident probe answers required to consider the generation as certain.
+- `chunk_size`: Number of tokens to generate per proposal round.
 
+Lowering either value saves more tokens but may risk accuracy.
 
- ## What is Dynasor?
+### Quick Start
 
- Dynasor is a tool that helps you speed up LLM reasoning model without training or finetuning. It uses a combination of techniques to improve & dynamically execute the prompt, and stop when the LLM has enough information to make a decision.
+1. **Basic usage**
+  `DynasorGenerationController` is a compute‑saving alternative to `NativeGenerationController`. To try it, run:
+   ```bash
+   python examples/scaffolding/contrib/Dynasor/scaffolding_dynasor_run.py
+   ```
 
- Dynasor-CoT is a subset of Dynasor library that optimizes for reasoning model such as `Deepseek-R1` and its distilled variants.
-
-
-
+2. **Add aggregation method**
+  You can wrap `DynasorGenerationController` with other controllers—for example, `MajorityVoteController` to perform majority voting:
+    ```bash
+    python examples/scaffolding/contrib/Dynasor/scaffolding_dynasor_run.py --majority_vote
+    ```
 
  ## References
 
  - Blog post - Dynasor: More Efficient Chain-of-Thought Through Certainty Probing: https://hao-ai-lab.github.io/blogs/dynasor-cot/
  - Codebase - https://github.com/hao-ai-lab/Dynasor
-
 
  If you use Dynasor for your research, please cite our [paper](https://arxiv.org/abs/2412.20993):
  ```
