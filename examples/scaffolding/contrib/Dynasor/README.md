@@ -1,6 +1,6 @@
 # Dynasor
 
-This document shows how to speed up reasoning models **without** training or fine‑tuning by using **Dynasor** ([Efficiently Serving LLM Reasoning Programs with Certaindex](https://arxiv.org/abs/2412.20993)) in TensorRT‑LLM.
+This document shows how to speed up reasoning models without training or fine‑tuning by using **Dynasor** ([Efficiently Serving LLM Reasoning Programs with Certaindex](https://arxiv.org/abs/2412.20993)) in TensorRT‑LLM.
 
 ## Overview
 
